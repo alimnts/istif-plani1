@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>İstif Planı 3D</title>
+<style>
+  :root{
+    --ink:#0f141b;
+    --panel:#161d27;
+    --panel-2:#1d2632;
+    --line:#2a3644;
+    --line-soft:#212b37;
+    --paper:#e6eaef;
+    --muted:#8a97a8;
+    --amber:#ffb020;
+    --teal:#3fb6a8;
+    --alarm:#ff6a45;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: "Helvetica Neue", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--ink);color:var(--paper);font-family:var(--sans);
+    display:flex;overflow:hidden;
+  }
+
+  /* ---------- Panel ---------- */
+  #panel{
+    width:372px;flex:0 0 372px;height:100%;overflow-y:auto;
+    background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;
+  }
+  .brand{
+    padding:18px 20px 14px;border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:10px;
+  }
+  .brand h1{
+    margin:0;font-size:15px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;
+  }
+  .brand span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+  .block{padding:18px 20px;border-bottom:1px solid var(--line)}
+  .block h2{
+    margin:0 0 12px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--amber);font-weight:700;display:flex;align-items:center;gap:8px;
+  }
+  .block h2::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  .field-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  label.f{display:flex;flex-direction:column;gap:5px}
+  label.f > i{
+    font-style:normal;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  }
+  input[type=number],input[type=text]{
+    width:100%;background:var(--ink);border:1px solid var(--line);color:var(--paper);
+    font-family:var(--mono);font-size:13px;padding:8px 9px;border-radius:3px;outline:none;
+  }
+  input[type=number]:focus,input[type=text]:focus{border-color:var(--amber);box-shadow:0 0 0 2px rgba(255,176,32,.15)}
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+  /* ---------- Ürün kartları ---------- */
+  #list{display:flex;flex-direction:column;gap:10px}
+  .card{
+    background:var(--panel-2);border:1px solid var(--line-soft);border-left:3px solid var(--c,#888);
+    border-radius:3px;padding:10px 11px;
+  }
+  .card .top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .card .top input[type=text]{border:none;background:transparent;padding:2px 0;font-family:var(--sans);font-weight:600;font-size:13px}
+  .card .top input[type=text]:focus{box-shadow:none;border-bottom:1px solid var(--amber)}
+  .swatch{position:relative;width:16px;height:16px;flex:0 0 16px;border-radius:2px;overflow:hidden;border:1px solid rgba(255,255,255,.18)}
+  .swatch input{position:absolute;inset:-6px;width:200%;height:200%;border:none;padding:0;background:none;cursor:pointer}
+  .del{
+    background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:3px;
+  }
+  .del:hover{color:var(--alarm);background:rgba(255,106,69,.1)}
+  .dims{display:grid;grid-template-columns:1fr 1fr 1fr 1.1fr;gap:6px}
+  .fit{
+    margin-top:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--muted);
+    display:flex;justify-content:space-between;
+  }
+  .fit b{color:var(--teal);font-weight:600}
+  .fit.short b{color:var(--alarm)}
+
+  button.add{
+    margin-top:12px;width:100%;padding:10px;background:transparent;color:var(--amber);
+    border:1px dashed rgba(255,176,32,.45);border-radius:3px;cursor:pointer;
+    font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  }
+  button.add:hover{background:rgba(255,176,32,.08);border-style:solid}
+
+  /* ---------- Ayarlar ---------- */
+  .opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:12.5px;color:#c3ccd8}
+  .opt input[type=checkbox]{appearance:none;width:34px;height:19px;border-radius:19px;background:var(--line);position:relative;cursor:pointer;transition:background .18s;border:none}
+  .opt input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#8a97a8;transition:transform .18s,background .18s}
+  .opt input[type=checkbox]:checked{background:rgba(255,176,32,.35)}
+  .opt input[type=checkbox]:checked::after{transform:translateX(15px);background:var(--amber)}
+  .opt input[type=number]{width:82px}
+
+  /* ---------- Özet ---------- */
+  #summary{padding:16px 20px;margin-top:auto;border-top:1px solid var(--line);background:var(--ink)}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:12px;color:var(--muted)}
+  .stat b{font-family:var(--mono);font-size:15px;color:var(--paper);font-weight:600}
+  .bar{height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden;margin:10px 0 4px}
+  .bar > div{height:100%;background:linear-gradient(90deg,var(--teal),var(--amber));width:0;transition:width .3s}
+  #warn{
+    display:none;margin-top:12px;padding:9px 11px;border-radius:3px;font-size:11.5px;line-height:1.45;
+    color:#ffd9cd;background:rgba(255,106,69,.1);
+    border-left:4px solid var(--alarm);
+    background-image:repeating-linear-gradient(45deg,rgba(255,106,69,.07) 0 8px,transparent 8px 16px);
+  }
+
+  /* ---------- Sahne ---------- */
+  #stage{flex:1;position:relative;min-width:0}
+  canvas{display:block;width:100%;height:100%;cursor:grab}
+  canvas:active{cursor:grabbing}
+  #hud{
+    position:absolute;top:0;left:0;right:0;padding:14px 18px;display:flex;gap:8px;align-items:center;
+    pointer-events:none;flex-wrap:wrap;
+  }
+  #hud > *{pointer-events:auto}
+  .chip{
+    background:rgba(22,29,39,.88);border:1px solid var(--line);color:#c3ccd8;
+    padding:6px 11px;border-radius:3px;cursor:pointer;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;font-weight:600;font-family:var(--sans);backdrop-filter:blur(6px);
+  }
+  .chip:hover{border-color:var(--amber);color:var(--amber)}
+  .chip.on{background:rgba(255,176,32,.14);border-color:var(--amber);color:var(--amber)}
+  #scrubwrap{
+    position:absolute;left:18px;right:18px;bottom:16px;display:flex;align-items:center;gap:12px;
+    background:rgba(22,29,39,.88);border:1px solid var(--line);border-radius:3px;padding:9px 14px;
+    backdrop-filter:blur(6px);
+  }
+  #scrub{flex:1;appearance:none;height:3px;background:var(--line);border-radius:2px;outline:none}
+  #scrub::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid var(--ink)}
+  #scrub::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid var(--ink)}
+  #scrublabel{font-family:var(--mono);font-size:11.5px;color:var(--muted);min-width:92px;text-align:right}
+  #empty{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;
+    font-size:13px;color:var(--muted);text-align:center;padding:0 30px;line-height:1.6;
+  }
+  ::-webkit-scrollbar{width:9px}
+  ::-webkit-scrollbar-track{background:var(--panel)}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+  ::-webkit-scrollbar-thumb:hover{background:#3a4757}
+
+  @media (max-width:900px){
+    body{flex-direction:column}
+    #panel{width:100%;flex:0 0 auto;max-height:52vh;border-right:none;border-bottom:1px solid var(--line)}
+    #stage{flex:1;min-height:48vh}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<aside id="panel">
+  <div class="brand">
+    <h1>İstif Planı</h1><span>3D · cm</span>
+  </div>
+
+  <section class="block">
+    <h2>Oda ölçüleri</h2>
+    <div class="field-row">
+      <label class="f"><i>En (X)</i><input type="number" id="rw" value="600" min="10" step="10"></label>
+      <label class="f"><i>Boy (Z)</i><input type="number" id="rd" value="400" min="10" step="10"></label>
+      <label class="f"><i>Yükseklik</i><input type="number" id="rh" value="280" min="10" step="10"></label>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Ürünler</h2>
+    <div id="list"></div>
+    <button class="add" id="addBtn">+ Ürün ekle</button>
+  </section>
+
+  <section class="block">
+    <h2>Yerleştirme</h2>
+    <div class="opt"><span>Ürünler arası boşluk</span><input type="number" id="gap" value="2" min="0" step="1"></div>
+    <div class="opt"><span>Yatayda çevirmeye izin ver</span><input type="checkbox" id="rot" checked></div>
+    <div class="opt"><span>Kutuları saydam göster</span><input type="checkbox" id="ghost"></div>
+  </section>
+
+  <div id="summary">
+    <div class="stat"><span>Yerleşen ürün</span><b id="sPlaced">0 / 0</b></div>
+    <div class="stat"><span>Kullanılan yükseklik</span><b id="sHeight">0 cm</b></div>
+    <div class="stat"><span>Hacim doluluğu</span><b id="sFill">%0</b></div>
+    <div class="bar"><div id="sBar"></div></div>
+    <div id="warn"></div>
+  </div>
+</aside>
+
+<main id="stage">
+  <div id="hud">
+    <button class="chip" data-view="iso">Serbest</button>
+    <button class="chip" data-view="top">Üst</button>
+    <button class="chip" data-view="front">Ön</button>
+    <button class="chip" data-view="side">Yan</button>
+    <button class="chip" id="fitBtn">Ekrana sığdır</button>
+    <button class="chip" id="playBtn">Yerleşimi oynat</button>
+  </div>
+  <div id="empty">Oda ölçülerini gir, ardından ürün ekle.<br>Yerleşim planı burada oluşur.</div>
+  <div id="scrubwrap">
+    <input type="range" id="scrub" min="0" max="0" value="0">
+    <span id="scrublabel">0 / 0 kutu</span>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   DURUM
+============================================================ */
+const PALETTE = ['#e0a04a','#4f96d6','#6cba7a','#d96f6f','#a58cd6','#48b5ab','#cf8ab5','#b3a94e'];
+let uid = 0;
+const state = {
+  room: {w:600, d:400, h:280},
+  gap: 2, rotate: true, ghost: false,
+  products: [
+    {id:++uid, name:'Ürün 1', w:120, d:80, h:60, qty:20, color:PALETTE[0]}
+  ]
+};
+let result = {placed:[], missing:[], usedH:0, fill:0, total:0};
+
+/* ============================================================
+   YERLEŞTİRME ALGORİTMASI
+   Katman > sıra > kutu sırasıyla ilerleyen raf (shelf) istifi.
+============================================================ */
+function pack(){
+  const R = state.room, g = state.gap, EPS = 1e-6;
+  const items = [];
+  state.products.forEach((p, pi)=>{
+    const n = Math.max(0, Math.floor(p.qty)||0);
+    for(let i=0;i<n;i++) items.push({pi, w:p.w, d:p.d, h:p.h});
+  });
+  // Aynı yükseklikteki kutular aynı katmanda kalsın diye önce boya göre sıralanır.
+  items.sort((a,b)=> b.h - a.h || a.pi - b.pi || (b.w*b.d) - (a.w*a.d));
+
+  const placed = [], missing = new Array(state.products.length).fill(0);
+  let cx = 0, cz = 0, cy = 0, rowD = 0, layerH = 0, usedH = 0, vol = 0;
+
+  const fits = (w,d,h)=> cx+w <= R.w+EPS && cz+d <= R.d+EPS && cy+h <= R.h+EPS;
+
+  for(const it of items){
+    const ors = (state.rotate && it.w !== it.d) ? [[it.w,it.d],[it.d,it.w]] : [[it.w,it.d]];
+    const attempt = ()=>{ for(const o of ors){ if(fits(o[0],o[1],it.h)) return o; } return null; };
+
+    let o = attempt();
+    if(!o){ cx = 0; cz += rowD; rowD = 0; o = attempt(); }          // yeni sıra
+    if(!o){ cx = 0; cz = 0; cy += layerH; layerH = 0; o = attempt(); } // yeni katman
+    if(!o){ missing[it.pi]++; continue; }                            // sığmadı
+
+    placed.push({pi:it.pi, x:cx, y:cy, z:cz, w:o[0], d:o[1], h:it.h});
+    cx += o[0] + g;
+    rowD = Math.max(rowD, o[1] + g);
+    layerH = Math.max(layerH, it.h + g);
+    usedH = Math.max(usedH, cy + it.h);
+    vol += it.w * it.d * it.h;
+  }
+
+  const roomVol = R.w * R.d * R.h;
+  result = {placed, missing, usedH, total:items.length, fill: roomVol ? vol/roomVol : 0};
+  return result;
+}
+
+/* ============================================================
+   ARAYÜZ
+============================================================ */
+const $ = id => document.getElementById(id);
+const listEl = $('list');
+
+function drawList(){
+  listEl.innerHTML = '';
+  state.products.forEach((p, i)=>{
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.setProperty('--c', p.color);
+    card.innerHTML = `
+      <div class="top">
+        <span class="swatch"><input type="color" value="${p.color}" data-k="color" aria-label="Renk"></span>
+        <input type="text" value="${p.name}" data-k="name" aria-label="Ürün adı">
+        <button class="del" title="Sil" aria-label="Ürünü sil">✕</button>
+      </div>
+      <div class="dims">
+        <label class="f"><i>En</i><input type="number" value="${p.w}" min="1" step="5" data-k="w"></label>
+        <label class="f"><i>Boy</i><input type="number" value="${p.d}" min="1" step="5" data-k="d"></label>
+        <label class="f"><i>Yük.</i><input type="number" value="${p.h}" min="1" step="5" data-k="h"></label>
+        <label class="f"><i>Adet</i><input type="number" value="${p.qty}" min="0" step="1" data-k="qty"></label>
+      </div>
+      <div class="fit" data-fit><span>—</span></div>`;
+
+    card.querySelectorAll('input').forEach(inp=>{
+      const k = inp.dataset.k;
+      inp.addEventListener('input', ()=>{
+        if(k === 'name' || k === 'color'){
+          p[k] = inp.value;
+          if(k === 'color'){ card.style.setProperty('--c', inp.value); update(); }
+          return;
+        }
+        const v = parseFloat(inp.value);
+        p[k] = isNaN(v) ? 0 : Math.max(0, v);
+        update();
+      });
+    });
+    card.querySelector('.del').addEventListener('click', ()=>{
+      state.products.splice(i,1); drawList(); update();
+    });
+    listEl.appendChild(card);
+  });
+}
+
+function drawStats(){
+  const placedCount = result.placed.length;
+  $('sPlaced').textContent = `${placedCount} / ${result.total}`;
+  $('sHeight').textContent = `${Math.round(result.usedH)} cm`;
+  const pct = Math.round(result.fill*100);
+  $('sFill').textContent = `%${pct}`;
+  $('sBar').style.width = Math.min(100,pct) + '%';
+
+  // ürün kartı rozetleri
+  document.querySelectorAll('#list .card').forEach((card,i)=>{
+    const p = state.products[i];
+    const miss = result.missing[i] || 0;
+    const want = Math.max(0, Math.floor(p.qty)||0);
+    const box = card.querySelector('[data-fit]');
+    box.className = 'fit' + (miss ? ' short' : '');
+    box.innerHTML = `<span>${p.w}×${p.d}×${p.h} cm</span><b>${want-miss}/${want} yerleşti</b>`;
+  });
+
+  const missTotal = result.missing.reduce((a,b)=>a+b,0);
+  const warn = $('warn');
+  if(missTotal){
+    const big = state.products.some(p=>p.qty>0 && (p.h > state.room.h ||
+      Math.min(p.w,p.d) > Math.max(state.room.w,state.room.d) ||
+      Math.max(p.w,p.d) > Math.max(state.room.w,state.room.d)));
+    warn.style.display = 'block';
+    warn.innerHTML = `<b>${missTotal} ürün sığmadı.</b> ` + (big
+      ? 'En az bir ürün odadan büyük — ölçüleri kontrol et.'
+      : 'Oda yüksekliğini artır, boşluğu azalt veya adetleri düşür.');
+  } else warn.style.display = 'none';
+
+  $('empty').style.display = placedCount ? 'none' : 'flex';
+}
+
+/* ============================================================
+   3D SAHNE
+============================================================ */
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x0f141b);
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0f141b, 30, 90);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 500);
+
+scene.add(new THREE.HemisphereLight(0xbcd4ff, 0x20242c, 0.85));
+const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(6,12,8); scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.3); rim.position.set(-8,5,-6); scene.add(rim);
+
+const roomGroup = new THREE.Group(); scene.add(roomGroup);
+const boxGroup  = new THREE.Group(); scene.add(boxGroup);
+
+const S = 0.01;                       // 1 cm = 0.01 birim
+const unitBox  = new THREE.BoxGeometry(1,1,1);
+const unitEdge = new THREE.EdgesGeometry(unitBox);
+const edgeMat  = new THREE.LineBasicMaterial({color:0x0f141b, transparent:true, opacity:.55});
+const matCache = {};
+function matFor(hex, ghost){
+  const k = hex + (ghost?'_g':'');
+  if(!matCache[k]) matCache[k] = new THREE.MeshLambertMaterial({
+    color:new THREE.Color(hex), transparent:ghost, opacity: ghost?0.34:1
+  });
+  return matCache[k];
+}
+
+function clear(g){
+  while(g.children.length){
+    const c = g.children.pop();
+    if(c.geometry && c.geometry !== unitBox && c.geometry !== unitEdge) c.geometry.dispose();
+    if(c.material && c.material.map) c.material.map.dispose();
+    g.remove(c);
+  }
+}
+
+function label(text){
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#8a97a8'; g.font = 'bold 30px ui-monospace, Menlo, Consolas, monospace';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 128, 32);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv), transparent:true, depthTest:false}));
+  sp.scale.set(1.4, .35, 1);
+  return sp;
+}
+
+function buildRoom(){
+  clear(roomGroup);
+  const W = state.room.w*S, D = state.room.d*S, H = state.room.h*S;
+
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W,D),
+    new THREE.MeshLambertMaterial({color:0x1a222d}));
+  floor.rotation.x = -Math.PI/2; floor.position.y = -0.002; roomGroup.add(floor);
+
+  const step = 0.5;
+  const grid = new THREE.GridHelper(Math.max(W,D), Math.max(2,Math.round(Math.max(W,D)/step)), 0x2c3644, 0x232c38);
+  roomGroup.add(grid);
+
+  const shell = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(W,H,D)),
+    new THREE.LineBasicMaterial({color:0x3fb6a8, transparent:true, opacity:.55}));
+  shell.position.y = H/2; roomGroup.add(shell);
+
+  const lw = label(state.room.w+' cm'); lw.position.set(0, .04, D/2+.28); roomGroup.add(lw);
+  const ld = label(state.room.d+' cm'); ld.position.set(W/2+.34, .04, 0); roomGroup.add(ld);
+  const lh = label(state.room.h+' cm'); lh.position.set(-W/2-.32, H/2, -D/2); roomGroup.add(lh);
+}
+
+function buildBoxes(){
+  clear(boxGroup);
+  const W = state.room.w*S, D = state.room.d*S;
+  const cap = 4000;
+  result.placed.slice(0, cap).forEach((b, i)=>{
+    const color = (state.products[b.pi] || {}).color || '#888';
+    const m = new THREE.Mesh(unitBox, matFor(color, state.ghost));
+    m.scale.set(b.w*S, b.h*S, b.d*S);
+    m.position.set(-W/2 + (b.x + b.w/2)*S, (b.y + b.h/2)*S, -D/2 + (b.z + b.d/2)*S);
+    m.userData.i = i;
+    boxGroup.add(m);
+    const e = new THREE.LineSegments(unitEdge, edgeMat);
+    e.scale.copy(m.scale); e.position.copy(m.position); e.userData.i = i;
+    boxGroup.add(e);
+  });
+  const sc = $('scrub');
+  const n = Math.min(result.placed.length, cap);
+  const wasFull = (+sc.value >= +sc.max) || +sc.max === 0;
+  sc.max = n; if(wasFull) sc.value = n; else sc.value = Math.min(+sc.value, n);
+  applyScrub();
+}
+
+function applyScrub(){
+  const n = +$('scrub').value;
+  boxGroup.children.forEach(c => c.visible = c.userData.i < n);
+  $('scrublabel').textContent = `${n} / ${$('scrub').max} kutu`;
+}
+
+/* ---------- Kamera ---------- */
+const target = new THREE.Vector3();
+const orbit = {r:12, theta:Math.PI*0.28, phi:Math.PI*0.36};
+function applyCam(){
+  orbit.phi = Math.max(0.06, Math.min(Math.PI*0.62, orbit.phi));
+  orbit.r   = Math.max(0.6, Math.min(120, orbit.r));
+  camera.position.set(
+    target.x + orbit.r*Math.sin(orbit.phi)*Math.sin(orbit.theta),
+    target.y + orbit.r*Math.cos(orbit.phi),
+    target.z + orbit.r*Math.sin(orbit.phi)*Math.cos(orbit.theta));
+  camera.lookAt(target);
+}
+function fitView(preset){
+  const W = state.room.w*S, D = state.room.d*S, H = state.room.h*S;
+  target.set(0, H/2, 0);
+  const span = Math.max(W, D, H);
+  orbit.r = span * 1.9 + 1;
+  if(preset === 'top')   { orbit.phi = 0.07;         orbit.theta = Math.PI*0.25; }
+  else if(preset==='front'){ orbit.phi = Math.PI/2;  orbit.theta = 0; }
+  else if(preset==='side') { orbit.phi = Math.PI/2;  orbit.theta = Math.PI/2; }
+  else { orbit.phi = Math.PI*0.36; orbit.theta = Math.PI*0.28; }
+  scene.fog.near = orbit.r*0.6; scene.fog.far = orbit.r*3.2;
+  applyCam();
+}
+
+/* ---------- Fare / dokunma ---------- */
+const el = renderer.domElement;
+let drag = null;
+el.addEventListener('pointerdown', e=>{
+  el.setPointerCapture(e.pointerId);
+  drag = {x:e.clientX, y:e.clientY, pan: e.button===2 || e.shiftKey};
+});
+el.addEventListener('pointermove', e=>{
+  if(!drag) return;
+  const dx = e.clientX-drag.x, dy = e.clientY-drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if(drag.pan){
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix,0);
+    const up    = new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);
+    const k = orbit.r*0.0016;
+    target.addScaledVector(right, -dx*k).addScaledVector(up, dy*k);
+  } else {
+    orbit.theta -= dx*0.006;
+    orbit.phi   -= dy*0.006;
+  }
+  applyCam();
+});
+const stop = e=>{ drag=null; };
+el.addEventListener('pointerup', stop); el.addEventListener('pointercancel', stop);
+el.addEventListener('contextmenu', e=>e.preventDefault());
+el.addEventListener('wheel', e=>{ e.preventDefault(); orbit.r *= (1 + Math.sign(e.deltaY)*0.1); applyCam(); }, {passive:false});
+let pinch = 0;
+el.addEventListener('touchmove', e=>{
+  if(e.touches.length===2){
+    const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    if(pinch) { orbit.r *= pinch/d; applyCam(); }
+    pinch = d; drag = null;
+  }
+},{passive:true});
+el.addEventListener('touchend', ()=>pinch=0);
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if(!w || !h) return;
+  renderer.setSize(w,h,false);
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+(function loop(){ requestAnimationFrame(loop); renderer.render(scene,camera); })();
+
+/* ============================================================
+   OLAYLAR
+============================================================ */
+function update(){ pack(); buildRoom(); buildBoxes(); drawStats(); }
+
+['rw','rd','rh'].forEach((id,i)=>{
+  $(id).addEventListener('input', ()=>{
+    const v = parseFloat($(id).value);
+    state.room[['w','d','h'][i]] = isNaN(v)?0:Math.max(1,v);
+    update(); fitView('iso');
+  });
+});
+$('gap').addEventListener('input', e=>{ state.gap = Math.max(0, parseFloat(e.target.value)||0); update(); });
+$('rot').addEventListener('change', e=>{ state.rotate = e.target.checked; update(); });
+$('ghost').addEventListener('change', e=>{ state.ghost = e.target.checked; matCache={}; buildBoxes(); });
+
+$('addBtn').addEventListener('click', ()=>{
+  const n = state.products.length;
+  state.products.push({id:++uid, name:`Ürün ${n+1}`, w:60, d:40, h:40, qty:10, color:PALETTE[n%PALETTE.length]});
+  drawList(); update();
+  listEl.lastElementChild.scrollIntoView({block:'nearest', behavior:'smooth'});
+});
+
+document.querySelectorAll('[data-view]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-view]').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); fitView(b.dataset.view);
+  });
+});
+$('fitBtn').addEventListener('click', ()=>fitView('iso'));
+$('scrub').addEventListener('input', applyScrub);
+
+let anim = null;
+$('playBtn').addEventListener('click', e=>{
+  const sc = $('scrub'), n = +sc.max;
+  if(anim){ clearInterval(anim); anim=null; e.target.classList.remove('on'); return; }
+  if(!n) return;
+  e.target.classList.add('on');
+  sc.value = 0; applyScrub();
+  const stepN = Math.max(1, Math.ceil(n/90));
+  anim = setInterval(()=>{
+    sc.value = Math.min(n, +sc.value + stepN); applyScrub();
+    if(+sc.value >= n){ clearInterval(anim); anim=null; e.target.classList.remove('on'); }
+  }, 24);
+});
+
+drawList();
+resize();
+update();
+fitView('iso');
+document.querySelector('[data-view="iso"]').classList.add('on');
+</script>
+</body>
+</html>
